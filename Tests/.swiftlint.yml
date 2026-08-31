@@ -1,0 +1,6 @@
+# Test-only relaxations: force casts on known JSON shapes and one-letter
+# fixture names are idiomatic in tests, not code smells.
+disabled_rules:
+  - force_cast
+  - force_try
+  - identifier_name

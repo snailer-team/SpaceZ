@@ -1,0 +1,47 @@
+name: Release
+
+# SPM distribution is the git tag itself — this workflow re-verifies the tagged
+# commit and publishes a GitHub Release with the matching CHANGELOG section.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify tagged commit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run full test suite
+        run: bash Scripts/ci_test.sh
+        env:
+          SPACEZ_CAPTURE_BUDGET_MS: "50"
+
+  release:
+    name: Publish GitHub Release
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract changelog section for this version
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Pull the "## [X.Y.Z]" section out of CHANGELOG.md.
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section found for $VERSION" > release-notes.md
+          fi
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          generate_release_notes: true

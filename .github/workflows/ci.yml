@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint (strict)
+        run: swiftlint --strict
+
+  test:
+    name: Build & Test (iOS Simulator)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Run package tests
+        # Includes the capture performance gate: a 5,000-node capture p95
+        # above SPACEZ_CAPTURE_BUDGET_MS fails the suite.
+        run: bash Scripts/ci_test.sh
+        env:
+          SPACEZ_CAPTURE_BUDGET_MS: "50"
+
+  demo-app:
+    name: Build DemoApp
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build example app against the local package
+        run: |
+          xcodebuild \
+            -project Examples/DemoApp/DemoApp.xcodeproj \
+            -scheme DemoApp \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

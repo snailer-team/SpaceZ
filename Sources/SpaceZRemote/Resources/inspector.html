@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpaceZ Inspector</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --border: #2b303b; --text: #d7dae0;
+    --dim: #8a919e; --accent: #4c9aff; --accent-dim: rgba(76,154,255,.18);
+    --error: #ff5c5c; --warn: #ffab40; --info: #4c9aff; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+    background: var(--panel); border-bottom: 1px solid var(--border); flex: none;
+  }
+  header h1 { font-size: 14px; margin: 0; letter-spacing: .4px; }
+  header h1 span { color: var(--accent); }
+  #status { font-size: 11px; color: var(--dim); }
+  #status.ok::before { content: "●"; color: #3fcf6e; margin-right: 5px; }
+  #status.bad::before { content: "●"; color: var(--error); margin-right: 5px; }
+  #meta { font-size: 11px; color: var(--dim); font-family: var(--mono); margin-left: auto; }
+  #search {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; width: 300px; font-family: var(--mono); font-size: 12px;
+  }
+  #search:focus { outline: none; border-color: var(--accent); }
+  main { flex: 1; display: flex; min-height: 0; }
+  #tree-pane {
+    width: 34%; min-width: 280px; border-right: 1px solid var(--border);
+    overflow: auto; padding: 6px 0; font-family: var(--mono); font-size: 12px;
+  }
+  .node-row {
+    display: flex; align-items: center; padding: 1px 8px; cursor: pointer;
+    white-space: nowrap; border-left: 2px solid transparent;
+  }
+  .node-row:hover { background: rgba(255,255,255,.04); }
+  .node-row.selected { background: var(--accent-dim); border-left-color: var(--accent); }
+  .node-row.dim-node .node-type { color: var(--dim); }
+  .twisty { width: 14px; flex: none; color: var(--dim); font-size: 10px; }
+  .node-type { color: #7ec3ff; }
+  .node-label { color: #c3e88d; margin-left: 6px; }
+  .node-id { color: var(--dim); margin-left: 6px; font-size: 10px; }
+  .node-badge { margin-left: 5px; font-size: 10px; }
+  #canvas-pane {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: #101216; min-width: 200px; position: relative;
+  }
+  #canvas { background: #0a0c0f; box-shadow: 0 0 24px rgba(0,0,0,.5); }
+  #canvas-hint { position: absolute; bottom: 8px; left: 12px; font-size: 11px; color: var(--dim); }
+  #detail-pane {
+    width: 30%; min-width: 300px; border-left: 1px solid var(--border);
+    overflow: auto; display: flex; flex-direction: column;
+  }
+  #detail-tabs { display: flex; border-bottom: 1px solid var(--border); flex: none; }
+  #detail-tabs button {
+    flex: 1; background: none; border: none; color: var(--dim); padding: 8px;
+    cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent;
+  }
+  #detail-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  #detail-content { padding: 10px 14px; overflow: auto; font-family: var(--mono); font-size: 12px; }
+  .prop-section { margin-bottom: 14px; }
+  .prop-section h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--dim); margin: 0 0 6px;
+  }
+  .prop-row { display: flex; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
+  .prop-key { width: 45%; color: var(--dim); flex: none; overflow-wrap: anywhere; }
+  .prop-val { color: var(--text); overflow-wrap: anywhere; }
+  .prop-val.redacted { color: var(--warn); }
+  .editable input {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; font-family: var(--mono); font-size: 11px; padding: 1px 5px; width: 90px;
+  }
+  .issue-item {
+    padding: 8px 10px; margin-bottom: 8px; background: var(--panel);
+    border-radius: 6px; border-left: 3px solid var(--info); cursor: pointer;
+  }
+  .issue-item.error { border-left-color: var(--error); }
+  .issue-item.warning { border-left-color: var(--warn); }
+  .issue-rule { font-size: 11px; color: var(--dim); }
+  .issue-msg { margin-top: 2px; }
+  .issue-fix { margin-top: 4px; font-size: 11px; color: var(--dim); }
+  .empty { color: var(--dim); padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Space<span>Z</span> Inspector</h1>
+  <span id="status" class="bad">connecting…</span>
+  <input id="search" placeholder="search: PayButton · alpha=0 · accessibilityLabel=nil  (Esc to clear)">
+  <span id="meta"></span>
+</header>
+<main>
+  <div id="tree-pane"></div>
+  <div id="canvas-pane">
+    <canvas id="canvas"></canvas>
+    <div id="canvas-hint">click a rect to select · selection highlights on device</div>
+  </div>
+  <div id="detail-pane">
+    <div id="detail-tabs">
+      <button id="tab-props" class="active">Properties</button>
+      <button id="tab-issues">Issues</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</main>
+<script>
+"use strict";
+// Injected by the device server when it serves this file.
+const WS_PORT = "__SPACEZ_WS_PORT__";
+const TOKEN = "__SPACEZ_TOKEN__";
+
+// ------------------------------------------------------------------ state
+// Client-side mirror of the device's normalized node store: id → node.
+// Kept fresh via push invalidation + partial getNodes refetch, never by
+// re-receiving the whole tree.
+const nodes = new Map();
+let rootIds = [];
+let version = 0;
+let selectedId = null;
+let expanded = new Set();
+let searchIds = null;      // null = not searching
+let issues = [];
+let activeTab = "props";
+let appName = "";
+
+const $ = (id) => document.getElementById(id);
+const treePane = $("tree-pane"), detailContent = $("detail-content");
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+
+// ------------------------------------------------------------------ ws
+let ws = null;
+function connect() {
+  ws = new WebSocket(`ws://${location.hostname}:${WS_PORT}/`);
+  ws.onopen = () => {
+    send({ type: "hello", token: TOKEN });
+    send({ type: "getTree" });
+    send({ type: "getIssues" });
+  };
+  ws.onclose = () => {
+    setStatus(false, "disconnected — retrying…");
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = (event) => handle(JSON.parse(event.data));
+}
+function send(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+function setStatus(ok, text) {
+  const el = $("status");
+  el.className = ok ? "ok" : "bad";
+  el.textContent = text;
+}
+
+function handle(msg) {
+  switch (msg.type) {
+    case "helloAck":
+      appName = msg.appName;
+      setStatus(true, `connected to ${appName}`);
+      break;
+    case "tree": {
+      nodes.clear();
+      for (const node of msg.nodes) nodes.set(node.id, node);
+      rootIds = msg.rootIds;
+      version = msg.version;
+      if (expanded.size === 0) {
+        // Open the first few levels on initial load.
+        for (const rootId of rootIds) {
+          expanded.add(rootId);
+          const root = nodes.get(rootId);
+          if (root) for (const childId of root.children) expanded.add(childId);
+        }
+      }
+      renderAll();
+      break;
+    }
+    case "invalidate":
+      // The core of the live-update protocol: prune removed nodes locally,
+      // refetch only the invalidated IDs.
+      version = msg.version;
+      rootIds = msg.rootIds;
+      for (const id of msg.removed) { nodes.delete(id); expanded.delete(id); }
+      if (msg.invalidated.length > 0) send({ type: "getNodes", ids: msg.invalidated });
+      send({ type: "getIssues" });
+      renderAll();
+      break;
+    case "nodes":
+      version = msg.version;
+      for (const node of msg.nodes) nodes.set(node.id, node);
+      renderAll();
+      break;
+    case "searchResults":
+      searchIds = msg.ids;
+      renderTree();
+      break;
+    case "issues":
+      issues = msg.issues;
+      if (activeTab === "issues") renderDetail();
+      renderTree(); // issue badges
+      break;
+    case "select":
+      // Device-side tap-to-select landed here.
+      selectNode(msg.id, { fromDevice: true });
+      break;
+    case "error":
+      if (msg.message === "Unauthorized") setStatus(false, "unauthorized token");
+      break;
+  }
+}
+
+// ------------------------------------------------------------------ geometry
+function frameOf(node) {
+  // CGRect encodes as [[x, y], [w, h]].
+  const f = node.frame;
+  return { x: f[0][0], y: f[0][1], w: f[1][0], h: f[1][1] };
+}
+
+// ------------------------------------------------------------------ tree
+const issueByNode = () => {
+  const map = new Map();
+  for (const issue of issues) {
+    const existing = map.get(issue.nodeID);
+    if (!existing || sevRank(issue.severity) > sevRank(existing)) map.set(issue.nodeID, issue.severity);
+  }
+  return map;
+};
+const sevRank = (severity) => ({ info: 1, warning: 2, error: 3 }[severity] || 0);
+const sevDot = (severity) => ({ info: "🔵", warning: "🟠", error: "🔴" }[severity] || "");
+
+function renderTree() {
+  const badges = issueByNode();
+  treePane.textContent = "";
+  const fragment = document.createDocumentFragment();
+
+  const addRow = (node, depth, hasKids) => {
+    const row = document.createElement("div");
+    row.className = "node-row" + (node.id === selectedId ? " selected" : "")
+      + (node.isHidden || node.alpha < 0.05 ? " dim-node" : "");
+    row.style.paddingLeft = 8 + depth * 14 + "px";
+    row.dataset.id = node.id;
+
+    const twisty = document.createElement("span");
+    twisty.className = "twisty";
+    twisty.textContent = hasKids ? (expanded.has(node.id) ? "▾" : "▸") : "";
+    row.appendChild(twisty);
+
+    const type = document.createElement("span");
+    type.className = "node-type";
+    type.textContent = node.type;
+    row.appendChild(type);
+
+    if (node.identifier) {
+      const idSpan = document.createElement("span");
+      idSpan.className = "node-label";
+      idSpan.textContent = "[" + node.identifier + "]";
+      row.appendChild(idSpan);
+    }
+    if (node.label) {
+      const label = document.createElement("span");
+      label.className = "node-label";
+      label.textContent = node.label;
+      row.appendChild(label);
+    }
+    const idTag = document.createElement("span");
+    idTag.className = "node-id";
+    idTag.textContent = "#" + node.id;
+    row.appendChild(idTag);
+
+    const severity = badges.get(node.id);
+    if (severity) {
+      const badge = document.createElement("span");
+      badge.className = "node-badge";
+      badge.textContent = sevDot(severity);
+      row.appendChild(badge);
+    }
+
+    row.onclick = (event) => {
+      if (hasKids && (event.target === twisty || event.detail === 2)) {
+        expanded.has(node.id) ? expanded.delete(node.id) : expanded.add(node.id);
+        renderTree();
+        return;
+      }
+      selectNode(node.id, {});
+    };
+    fragment.appendChild(row);
+  };
+
+  if (searchIds) {
+    if (searchIds.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "no matches";
+      fragment.appendChild(empty);
+    }
+    for (const id of searchIds) {
+      const node = nodes.get(id);
+      if (node) addRow(node, 0, false);
+    }
+  } else {
+    const walk = (id, depth) => {
+      const node = nodes.get(id);
+      if (!node) return;
+      addRow(node, depth, node.children.length > 0);
+      if (expanded.has(id)) for (const childId of node.children) walk(childId, depth + 1);
+    };
+    for (const rootId of rootIds) walk(rootId, 0);
+  }
+  treePane.appendChild(fragment);
+  $("meta").textContent = `v${version} · ${nodes.size} nodes`;
+}
+
+function selectNode(id, { fromDevice }) {
+  selectedId = id;
+  // Reveal: expand all ancestors (parent index built on the fly).
+  const parents = new Map();
+  for (const node of nodes.values()) for (const childId of node.children) parents.set(childId, node.id);
+  let cursor = id;
+  while (cursor !== undefined) { expanded.add(cursor); cursor = parents.get(cursor); }
+  activeTab = "props";
+  setTab("props");
+  renderAll();
+  const row = treePane.querySelector(`[data-id="${id}"]`);
+  if (row) row.scrollIntoView({ block: "nearest" });
+  if (!fromDevice) send({ type: "highlight", id });
+}
+
+// ------------------------------------------------------------------ canvas
+function renderCanvas() {
+  if (rootIds.length === 0) return;
+  const rootFrames = rootIds.map((id) => nodes.get(id)).filter(Boolean).map(frameOf);
+  const deviceW = Math.max(...rootFrames.map((f) => f.x + f.w), 1);
+  const deviceH = Math.max(...rootFrames.map((f) => f.y + f.h), 1);
+
+  const paneW = $("canvas-pane").clientWidth - 40;
+  const paneH = $("canvas-pane").clientHeight - 40;
+  const scale = Math.min(paneW / deviceW, paneH / deviceH, 1.2);
+  canvas.width = Math.round(deviceW * scale * devicePixelRatio);
+  canvas.height = Math.round(deviceH * scale * devicePixelRatio);
+  canvas.style.width = Math.round(deviceW * scale) + "px";
+  canvas.style.height = Math.round(deviceH * scale) + "px";
+  ctx.setTransform(devicePixelRatio * scale, 0, 0, devicePixelRatio * scale, 0, 0);
+  ctx.clearRect(0, 0, deviceW, deviceH);
+  canvas._scale = scale;
+
+  const walk = (id, clip) => {
+    const node = nodes.get(id);
+    if (!node || node.isHidden || node.alpha <= 0.01) return;
+    const f = frameOf(node);
+    if (f.w > 0 && f.h > 0) {
+      ctx.strokeStyle = "rgba(126,195,255,0.25)";
+      ctx.lineWidth = 1 / (devicePixelRatio * canvas._scale);
+      ctx.strokeRect(f.x, f.y, f.w, f.h);
+    }
+    for (const childId of node.children) walk(childId, clip);
+  };
+  for (const rootId of rootIds) walk(rootId);
+
+  if (selectedId !== null) {
+    const node = nodes.get(selectedId);
+    if (node) {
+      const f = frameOf(node);
+      ctx.fillStyle = "rgba(76,154,255,0.25)";
+      ctx.fillRect(f.x, f.y, f.w, f.h);
+      ctx.strokeStyle = "#4c9aff";
+      ctx.lineWidth = 2 / (devicePixelRatio * canvas._scale);
+      ctx.strokeRect(f.x, f.y, f.w, f.h);
+    }
+  }
+}
+
+canvas.onclick = (event) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / canvas._scale;
+  const y = (event.clientY - rect.top) / canvas._scale;
+  // Deepest, then smallest-area node containing the point wins.
+  let best = null, bestArea = Infinity;
+  for (const node of nodes.values()) {
+    if (node.isHidden || node.alpha <= 0.01) continue;
+    const f = frameOf(node);
+    if (f.w <= 0 || f.h <= 0) continue;
+    if (x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h) {
+      const area = f.w * f.h;
+      if (area < bestArea) { bestArea = area; best = node.id; }
+    }
+  }
+  if (best !== null) selectNode(best, {});
+};
+
+// ------------------------------------------------------------------ detail
+function setTab(tab) {
+  activeTab = tab;
+  $("tab-props").className = tab === "props" ? "active" : "";
+  $("tab-issues").className = tab === "issues" ? "active" : "";
+  renderDetail();
+}
+$("tab-props").onclick = () => setTab("props");
+$("tab-issues").onclick = () => setTab("issues");
+
+// Property keys the device-side allowlist allows writing back.
+const EDITABLE = { alpha: "number", isHidden: "bool" };
+
+function renderDetail() {
+  detailContent.textContent = "";
+  if (activeTab === "issues") { renderIssues(); return; }
+
+  const node = selectedId !== null ? nodes.get(selectedId) : null;
+  if (!node) {
+    detailContent.innerHTML = '<div class="empty">select a node</div>';
+    return;
+  }
+  const f = frameOf(node);
+  const core = {
+    id: "#" + node.id, type: node.type,
+    identifier: node.identifier ?? "nil", label: node.label ?? "nil",
+    frame: `(${f.x.toFixed(1)}, ${f.y.toFixed(1)}, ${f.w.toFixed(1)}, ${f.h.toFixed(1)})`,
+    alpha: node.alpha, isHidden: node.isHidden, clipsToBounds: node.clipsToBounds,
+    isUserInteractionEnabled: node.isUserInteractionEnabled,
+    accessibilityLabel: node.accessibilityLabel ?? "nil",
+    children: node.children.length,
+  };
+
+  const section = (title, entries, editable) => {
+    const wrap = document.createElement("div");
+    wrap.className = "prop-section";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    wrap.appendChild(heading);
+    for (const [key, value] of entries) {
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      const keyEl = document.createElement("span");
+      keyEl.className = "prop-key";
+      keyEl.textContent = key;
+      row.appendChild(keyEl);
+      const valEl = document.createElement("span");
+      valEl.className = "prop-val" + (value === "[REDACTED]" ? " redacted" : "");
+      if (editable && EDITABLE[key]) {
+        valEl.className += " editable";
+        const input = document.createElement("input");
+        input.value = String(value);
+        input.onkeydown = (keyEvent) => {
+          if (keyEvent.key !== "Enter") return;
+          const kind = EDITABLE[key];
+          const wire = kind === "number"
+            ? { k: "number", v: parseFloat(input.value) }
+            : { k: "bool", v: input.value.trim() === "true" };
+          send({ type: "setProperty", id: node.id, key, value: wire });
+        };
+        valEl.appendChild(input);
+      } else {
+        valEl.textContent = String(value);
+      }
+      row.appendChild(valEl);
+      wrap.appendChild(row);
+    }
+    detailContent.appendChild(wrap);
+  };
+
+  section("Node", Object.entries(core), true);
+  const props = Object.entries(node.properties || {})
+    .map(([key, value]) => [key, wireValueToString(value)])
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  if (props.length) section("Properties", props, false);
+  const nodeIssues = issues.filter((issue) => issue.nodeID === node.id)
+    .map((issue) => [sevDot(issue.severity) + " " + issue.ruleID, issue.message]);
+  if (nodeIssues.length) section("Issues", nodeIssues, false);
+}
+
+function wireValueToString(value) {
+  switch (value.k) {
+    case "string": case "color": return value.v;
+    case "number": return String(value.v);
+    case "bool": return String(value.v);
+    case "rect": return `(${value.v.map((n) => n.toFixed(1)).join(", ")})`;
+    case "size": case "point": return `(${value.v.map((n) => n.toFixed(1)).join(", ")})`;
+    case "redacted": return "[REDACTED]";
+    case "null": return "nil";
+    default: return JSON.stringify(value);
+  }
+}
+
+function renderIssues() {
+  if (issues.length === 0) {
+    detailContent.innerHTML = '<div class="empty">no issues found 🎉</div>';
+    return;
+  }
+  for (const issue of issues) {
+    const item = document.createElement("div");
+    item.className = "issue-item " + issue.severity;
+    const rule = document.createElement("div");
+    rule.className = "issue-rule";
+    rule.textContent = `${sevDot(issue.severity)} ${issue.ruleID} · node #${issue.nodeID}`;
+    item.appendChild(rule);
+    const message = document.createElement("div");
+    message.className = "issue-msg";
+    message.textContent = issue.message;
+    item.appendChild(message);
+    if (issue.suggestion) {
+      const fix = document.createElement("div");
+      fix.className = "issue-fix";
+      fix.textContent = "→ " + issue.suggestion;
+      item.appendChild(fix);
+    }
+    item.onclick = () => selectNode(issue.nodeID, {});
+    detailContent.appendChild(item);
+  }
+}
+
+// ------------------------------------------------------------------ search
+let searchTimer = null;
+$("search").oninput = (event) => {
+  clearTimeout(searchTimer);
+  const query = event.target.value.trim();
+  searchTimer = setTimeout(() => {
+    if (query === "") { searchIds = null; renderTree(); }
+    else send({ type: "search", query });
+  }, 200);
+};
+$("search").onkeydown = (event) => {
+  if (event.key === "Escape") {
+    event.target.value = "";
+    searchIds = null;
+    renderTree();
+  }
+};
+
+function renderAll() { renderTree(); renderCanvas(); renderDetail(); }
+window.onresize = renderCanvas;
+connect();
+</script>
+</body>
+</html>

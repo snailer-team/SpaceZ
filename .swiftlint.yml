@@ -1,0 +1,41 @@
+included:
+  - Sources
+  - Tests
+  - Examples/DemoApp/DemoApp
+
+line_length:
+  warning: 110
+  error: 140
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded: [x, y, w, h, id, ws, ok]
+
+type_body_length:
+  warning: 400
+
+file_length:
+  warning: 600
+
+function_body_length:
+  warning: 80
+
+cyclomatic_complexity:
+  warning: 15
+
+nesting:
+  type_level: 3
+
+disabled_rules:
+  # Trailing-closure and multiline styles follow the surrounding code.
+  - opening_brace
+  - todo
+  # Trailing commas in multiline literals keep diffs one-line.
+  - trailing_comma
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - contains_over_first_not_nil
+  - redundant_nil_coalescing

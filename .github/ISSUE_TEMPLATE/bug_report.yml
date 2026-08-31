@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in SpaceZ doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        Minimal steps or code. If the bug involves a specific hierarchy shape,
+        an export from `GET /snapshot.json` (redacted by default) is the most
+        useful attachment.
+      placeholder: |
+        1. SpaceZDebugger.start()
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SpaceZ version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: iOS version, Xcode version, device or simulator
+      placeholder: "iOS 18.2, Xcode 26.4, iPhone 15 Pro simulator"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Capture engine / snapshots
+        - In-app overlay
+        - Remote inspector (server / web client)
+        - Rules / diagnostics
+        - SwiftUI semantic tree
+        - Performance
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Console output (subsystem `io.spacez`), if relevant.
+      render: text
