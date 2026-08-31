@@ -28,7 +28,8 @@ xcodebuild \
   test | tee /tmp/xcodebuild-test.log | grep -E "Test Suite|Executed|error|SpaceZ perf" || true
 
 # xcodebuild's exit code is lost in the pipe above; verify from the log.
-if grep -q "** TEST FAILED **" /tmp/xcodebuild-test.log; then
+# -F: the leading "**" is an invalid regex on some grep builds — match literally.
+if grep -qF "** TEST FAILED **" /tmp/xcodebuild-test.log; then
   exit 1
 fi
-grep -q "** TEST SUCCEEDED **" /tmp/xcodebuild-test.log
+grep -qF "** TEST SUCCEEDED **" /tmp/xcodebuild-test.log
