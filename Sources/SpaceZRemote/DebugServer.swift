@@ -51,8 +51,6 @@ public actor DebugServer {
         }
         // Bonjour lets tools discover the app without typing an IP.
         http.service = NWListener.Service(name: nil, type: "_spacez._tcp")
-        http.start(queue: .global(qos: .utility))
-        httpListener = http
 
         let wsParams = NWParameters.tcp
         let wsOptions = NWProtocolWebSocket.Options()
@@ -62,8 +60,44 @@ public actor DebugServer {
         ws.newConnectionHandler = { [weak self] connection in
             Task { await self?.acceptWebSocket(connection) }
         }
-        ws.start(queue: .global(qos: .utility))
-        wsListener = ws
+
+        // NWListener reports bind failures (EADDRINUSE etc.) asynchronously
+        // through its state, not from start(). Without waiting for .ready,
+        // start() would "succeed" against an occupied port and the caller
+        // would print an inspector URL that can never work.
+        do {
+            try await startAndAwaitReady(http)
+            httpListener = http
+            try await startAndAwaitReady(ws)
+            wsListener = ws
+        } catch {
+            http.cancel()
+            ws.cancel()
+            httpListener = nil
+            wsListener = nil
+            throw error
+        }
+    }
+
+    private func startAndAwaitReady(_ listener: NWListener) async throws {
+        // The state handler keeps firing after readiness; the guard makes the
+        // continuation one-shot.
+        let once = OneShot()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if once.claim() { continuation.resume() }
+                case .failed(let error):
+                    if once.claim() { continuation.resume(throwing: error) }
+                case .cancelled:
+                    if once.claim() { continuation.resume(throwing: CancellationError()) }
+                default:
+                    break
+                }
+            }
+            listener.start(queue: .global(qos: .utility))
+        }
     }
 
     public func stop() {
@@ -226,5 +260,19 @@ public actor DebugServer {
     private func dropConnection(_ id: ObjectIdentifier) {
         connections[id] = nil
         authenticated.remove(id)
+    }
+}
+
+/// Lock-guarded single-claim flag, usable from any queue.
+private final class OneShot: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }

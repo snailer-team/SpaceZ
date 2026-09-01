@@ -217,11 +217,15 @@ public final class SpaceZSession {
 
         let host = NetworkInterfaces.primaryIPv4Address() ?? "localhost"
         let url = URL(string: "http://\(host):\(configuration.httpPort)/?token=\(server.token)")
-        inspectorURL = url
+        let port = configuration.httpPort
 
-        Task {
+        Task { [weak self] in
             do {
                 try await server.start()
+                // Only advertise the URL once both listeners are actually
+                // bound — printing it earlier would hand out a dead link when
+                // the port is taken.
+                await MainActor.run { self?.inspectorURL = url }
                 SpaceZDebugger.logger.info(
                     "Remote inspector ready → \(url?.absoluteString ?? "?", privacy: .public)"
                 )
@@ -229,7 +233,13 @@ public final class SpaceZSession {
                 print("[SpaceZ] Inspector → \(url?.absoluteString ?? "?")")
             } catch {
                 SpaceZDebugger.logger.error(
-                    "Remote inspector failed to start: \(error, privacy: .public)"
+                    "Remote inspector failed to start on port \(port): \(error, privacy: .public)"
+                )
+                print(
+                    "[SpaceZ] Remote inspector failed to start on port \(port) "
+                    + "(\(error)). Another app may hold it — set "
+                    + "SpaceZConfiguration.httpPort to a free port. "
+                    + "The in-app overlay still works."
                 )
             }
         }
