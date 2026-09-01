@@ -58,6 +58,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             tabs.selectedIndex = index
         }
 
+        // -autoOpenInspector 1 opens the SpaceZ panel shortly after launch —
+        // used for screenshot automation and UI tests.
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "autoOpenInspector") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                SpaceZDebugger.presentInspector()
+            }
+        }
+        #endif
+
         window.rootViewController = tabs
         window.makeKeyAndVisible()
         self.window = window

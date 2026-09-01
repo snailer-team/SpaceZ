@@ -22,6 +22,15 @@ actually made of, and what state is each one in?**
      the view instead of fading it out.
 ```
 
+*The browser inspector, one URL away — live tree, frame canvas, properties,
+and the planted bug caught by the rule engine:*
+
+![Web inspector with the LoadingOverlay bug selected](Docs/screenshots/web-inspector.png)
+
+| In-app inspector (`presentInspector()` or the floating **Z** button) | Browser selection highlighting live on device |
+|:---:|:---:|
+| ![On-device tree browser](Docs/screenshots/overlay-panel.png) | ![Remote highlight on device](Docs/screenshots/device-highlight.png) |
+
 ## What you get
 
 - **In-app inspector** — floating button → live hierarchy tree, property
@@ -79,6 +88,9 @@ SpaceZDebugger.start(configuration: config)
 
 SpaceZDebugger.register(rule: MyDeprecatedComponentRule()) // custom diagnostics
 SpaceZDebugger.register(descriptor: MyFrameworkDescriptor()) // custom UI framework
+
+SpaceZDebugger.presentInspector()   // open the panel from your own trigger
+                                    // (debug menu, shake gesture, UI test)
 ```
 
 Try it immediately: `open Examples/DemoApp/DemoApp.xcodeproj` — a demo app with

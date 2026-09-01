@@ -81,6 +81,13 @@ public final class OverlayCoordinator {
         button = nil
     }
 
+    /// Opens the inspector panel programmatically — the same panel the
+    /// floating button presents. Lets hosts wire it to their own trigger
+    /// (debug menu item, shake gesture, UI test launch argument).
+    public func presentInspector() {
+        presentPanel()
+    }
+
     private func attachToActiveScene() -> Bool {
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })

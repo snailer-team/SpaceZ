@@ -65,6 +65,14 @@ public enum SpaceZDebugger {
         session?.detector.markDirty()
     }
 
+    /// Opens the on-device inspector panel, exactly as tapping the floating
+    /// button does. Useful from a debug menu, a shake-gesture handler, or a
+    /// UI-test launch argument. No-op when the overlay is disabled or the
+    /// debugger isn't running.
+    public static func presentInspector() {
+        session?.presentInspector()
+    }
+
     /// Register a custom framework adapter (consulted before built-ins).
     public static func register(descriptor: NodeDescriptor) {
         session?.engine.descriptors.register(descriptor, prepend: true)
@@ -146,6 +154,10 @@ public final class SpaceZSession {
     @discardableResult
     func captureNow() -> Snapshot? {
         captureAndPublish()
+    }
+
+    func presentInspector() {
+        overlay?.presentInspector()
     }
 
     @discardableResult

@@ -6,6 +6,23 @@ All notable changes to SpaceZ are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-01
+
+### Added
+
+- `SpaceZDebugger.presentInspector()` — open the on-device inspector panel
+  programmatically (debug menu, shake gesture, UI-test launch argument).
+- README screenshots (web inspector, in-app panel, remote highlight) captured
+  from the live demo app.
+
+### Fixed
+
+- The remote server now waits for both listeners to reach `.ready` before
+  advertising the inspector URL. Previously a bind failure (port already in
+  use) surfaced asynchronously, so the console printed a URL that could never
+  work; now the failure is logged with the cause and a remediation hint, and
+  the app keeps running with the overlay intact.
+
 ## [1.0.0] - 2026-08-31
 
 Initial release.
@@ -42,5 +59,6 @@ Initial release.
 - CI (lint + tests + perf gate + example build), release workflow, contribution
   guide, PR/issue templates.
 
-[Unreleased]: https://github.com/snailer-team/SpaceZ/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/snailer-team/SpaceZ/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/snailer-team/SpaceZ/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/snailer-team/SpaceZ/releases/tag/v1.0.0
