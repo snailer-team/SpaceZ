@@ -158,13 +158,18 @@ The library is the lecture-series design
 
 ### Performance, honestly
 
-Measured by `CapturePerformanceTests` (5,551-node synthetic tree, iPhone 15 Pro
-simulator, **debug build -Onone**): capture p50 ≈ 10.5 ms, p95 ≈ 12 ms. At the
-default 250 ms throttle that is ~4% of main-thread time while debugging.
-Release-optimized builds are substantially faster; the 2/5/8 ms budget targets
-release-config numbers, and CI fails any PR whose p95 crosses 50 ms on shared
-runners. Capture-path PRs must include before/after numbers (see the PR
-template).
+Measured by `CapturePerformanceTests` on a 5,551-node synthetic tree
+(iPhone 15 Pro simulator):
+
+| Build | p50 | p95 | vs budget (2 / 5 / 8 ms) |
+|---|---|---|---|
+| Debug `-Onone` (what you debug in) | ~10.5 ms | ~12 ms | over — 250 ms throttle keeps main-thread usage at ~4% |
+| Optimized `-O` | **3.44 ms** | **3.80 ms** | p95 ✅, hard ✅; p50 misses the 2 ms target by 1.7× |
+
+The runtime logs a warning whenever a capture exceeds the hard budget, so
+regressions surface where they happen. CI fails any PR whose p95 crosses
+50 ms on shared runners, and capture-path PRs must include before/after
+numbers (see the PR template).
 
 ## Security model
 

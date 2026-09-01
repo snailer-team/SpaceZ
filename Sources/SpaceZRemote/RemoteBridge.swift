@@ -19,6 +19,38 @@ public struct RemoteUIHandlers: Sendable {
     }
 }
 
+/// Where a snapshot came from — device, OS, app build, locale.
+///
+/// A hierarchy snapshot without its environment can't explain
+/// device-specific bugs ("text clips only on that customer's phone"):
+/// the same screen renders differently per Dynamic Type, locale, and OS.
+/// This rides along in `/snapshot.json` so a saved snapshot is a complete
+/// field report, not just a tree.
+public struct SnapshotEnvironment: Sendable, Codable {
+    public var appName: String
+    public var appVersion: String
+    public var osVersion: String
+    public var deviceModel: String
+    public var locale: String
+    public var preferredContentSize: String
+
+    public init(
+        appName: String = ProcessInfo.processInfo.processName,
+        appVersion: String = "unknown",
+        osVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        deviceModel: String = "unknown",
+        locale: String = Locale.current.identifier,
+        preferredContentSize: String = "unknown"
+    ) {
+        self.appName = appName
+        self.appVersion = appVersion
+        self.osVersion = osVersion
+        self.deviceModel = deviceModel
+        self.locale = locale
+        self.preferredContentSize = preferredContentSize
+    }
+}
+
 /// Inspector logic between the snapshot pipeline and the transport.
 ///
 /// Owns the *redacted* copy of the world: snapshots enter through
@@ -30,7 +62,8 @@ public actor RemoteBridge {
     private let writableKeys: Set<String>
     private let ruleEngine: RuleEngine
     private let handlers: RemoteUIHandlers
-    private let appName: String
+    private let environment: SnapshotEnvironment
+    private var appName: String { environment.appName }
 
     private var current: Snapshot?
     private var broadcast: (@Sendable (InspectorResponse) -> Void)?
@@ -40,13 +73,13 @@ public actor RemoteBridge {
         writableKeys: Set<String>,
         ruleEngine: RuleEngine = RuleEngine(),
         handlers: RemoteUIHandlers,
-        appName: String = ProcessInfo.processInfo.processName
+        environment: SnapshotEnvironment = SnapshotEnvironment()
     ) {
         self.redaction = redaction
         self.writableKeys = writableKeys
         self.ruleEngine = ruleEngine
         self.handlers = handlers
-        self.appName = appName
+        self.environment = environment
     }
 
     /// Wire the push channel (server broadcast). Called once by the server.
@@ -144,6 +177,7 @@ public actor RemoteBridge {
         struct Export: Encodable {
             let version: UInt64
             let capturedAt: Date
+            let environment: SnapshotEnvironment
             let rootIds: [NodeID]
             let nodes: [InspectorNode]
         }
@@ -153,6 +187,7 @@ public actor RemoteBridge {
         return try encoder.encode(Export(
             version: current.version,
             capturedAt: current.capturedAt,
+            environment: environment,
             rootIds: current.rootIDs,
             nodes: Array(current.nodes.values)
         ))

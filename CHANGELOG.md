@@ -6,6 +6,21 @@ All notable changes to SpaceZ are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-01
+
+### Added
+
+- `SnapshotEnvironment`: `/snapshot.json` exports now carry the capture
+  environment (app version/build, OS version, device model, locale, Dynamic
+  Type category), turning a saved snapshot into a complete field report for
+  device-specific bugs.
+
+### Changed
+
+- README performance table now reports measured optimized-build numbers
+  (5,551 nodes: p50 3.44 ms / p95 3.80 ms on simulator) alongside debug-build
+  numbers.
+
 ## [1.1.0] - 2026-09-01
 
 ### Added
@@ -59,6 +74,7 @@ Initial release.
 - CI (lint + tests + perf gate + example build), release workflow, contribution
   guide, PR/issue templates.
 
-[Unreleased]: https://github.com/snailer-team/SpaceZ/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/snailer-team/SpaceZ/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/snailer-team/SpaceZ/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/snailer-team/SpaceZ/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/snailer-team/SpaceZ/releases/tag/v1.0.0

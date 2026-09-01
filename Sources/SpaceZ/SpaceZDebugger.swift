@@ -216,11 +216,27 @@ public final class SpaceZSession {
             }
         )
 
+        let bundle = Bundle.main
+        let shortVersion = bundle.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let buildNumber = bundle.object(
+            forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        let environment = SnapshotEnvironment(
+            appName: bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
+                ?? ProcessInfo.processInfo.processName,
+            appVersion: "\(shortVersion) (\(buildNumber))",
+            osVersion: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)",
+            deviceModel: UIDevice.current.model,
+            locale: Locale.current.identifier,
+            preferredContentSize: UIApplication.shared.preferredContentSizeCategory.rawValue
+        )
+
         let bridge = RemoteBridge(
             redaction: configuration.remoteRedaction,
             writableKeys: writableKeys,
             ruleEngine: ruleEngine,
-            handlers: handlers
+            handlers: handlers,
+            environment: environment
         )
         self.bridge = bridge
 

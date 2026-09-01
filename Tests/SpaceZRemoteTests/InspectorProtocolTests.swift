@@ -160,6 +160,51 @@ final class RemoteBridgeTests: XCTestCase {
         XCTAssertTrue(ok)
     }
 
+    func testSnapshotExportCarriesEnvironmentMetadata() async throws {
+        // FR6: a saved snapshot must be a complete field report — the same
+        // screen renders differently per device/OS/locale, so a tree without
+        // its environment can't explain device-specific bugs.
+        let bridge = RemoteBridge(
+            redaction: .strict,
+            writableKeys: [],
+            handlers: RemoteUIHandlers(highlight: { _ in }, setProperty: { _, _, _ in false }),
+            environment: SnapshotEnvironment(
+                appName: "TestApp",
+                appVersion: "2.1 (77)",
+                osVersion: "iOS 18.0",
+                deviceModel: "iPhone",
+                locale: "ko_KR",
+                preferredContentSize: "UICTContentSizeCategoryL"
+            )
+        )
+        await bridge.ingest(snapshot())
+
+        let data = try await bridge.currentSnapshotJSON()
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let environment = json["environment"] as! [String: Any]
+        XCTAssertEqual(environment["appVersion"] as? String, "2.1 (77)")
+        XCTAssertEqual(environment["osVersion"] as? String, "iOS 18.0")
+        XCTAssertEqual(environment["deviceModel"] as? String, "iPhone")
+        XCTAssertEqual(environment["locale"] as? String, "ko_KR")
+        XCTAssertNotNil(json["capturedAt"], "timestamp is part of the field report")
+    }
+
+    func testDeviceSelectionIsPushedToClients() async {
+        // FR3 reverse direction: tap-to-select on the device must surface in
+        // the connected tool as a select push.
+        let bridge = makeBridge()
+        let received = ReceivedBox()
+        await bridge.setBroadcast { received.append($0) }
+
+        await bridge.pushSelection(NodeID(rawValue: 42))
+
+        let messages = received.snapshotMessages()
+        guard case .select(let id) = messages.last else {
+            return XCTFail("expected select push, got \(messages)")
+        }
+        XCTAssertEqual(id, NodeID(rawValue: 42))
+    }
+
     func testChangePushesInvalidationNotContent() async {
         let bridge = makeBridge()
         let received = ReceivedBox()
