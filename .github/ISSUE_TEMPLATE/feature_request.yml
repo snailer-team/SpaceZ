@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose new functionality for SpaceZ
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >
+        What debugging problem can't you solve today? Concrete scenarios
+        ("QA reported X and I couldn't see Y") carry more weight than
+        abstract capabilities.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >
+        How would it work? If it's a new diagnostic, consider whether it can be
+        a custom `UIRule` (registerable today) before proposing core changes.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Design constraints check
+      description: >
+        SpaceZ holds three invariants — how does your proposal interact with
+        them? (1) main-thread capture budget, (2) redaction-by-default over
+        transport, (3) zero third-party dependencies.
+    validations:
+      required: false
